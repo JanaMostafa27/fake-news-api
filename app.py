@@ -9,6 +9,7 @@ import string
 import pickle
 import functools
 import torch
+import gdown
 
 import numpy as np
 from flask import Flask, request, jsonify
@@ -44,6 +45,13 @@ def require_api_key(f):
 ARTIFACT_DIR = os.environ.get("ARTIFACT_DIR", "model_artifacts")
 MODEL_PATH = os.path.join(ARTIFACT_DIR, "multi_task_distilbert.pt")
 PREP_PATH    = os.path.join(ARTIFACT_DIR, "preprocessor.pkl")
+
+# Download only if not already present (volume caches them)
+if not os.path.exists(MODEL_PATH):
+    gdown.download("https://drive.google.com/drive/folders/1XQtOiU5kmTOwTiF9AeAWA9CftxycfsY_?usp=drive_link", MODEL_PATH, fuzzy=True)
+
+if not os.path.exists(PREP_PATH):
+    gdown.download("https://drive.google.com/drive/folders/1XQtOiU5kmTOwTiF9AeAWA9CftxycfsY_?usp=drive_link", PREP_PATH, fuzzy=True)
 
 print(f"Loading model from {MODEL_PATH} ...")
 _model = torch.load(MODEL_PATH, map_location=torch.device('cpu'))
