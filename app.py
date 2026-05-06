@@ -11,9 +11,9 @@ import functools
 import torch
 import gdown
 import zipfile
+
 import numpy as np
 from flask import Flask, request, jsonify
-import tensorflow as tf
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 # ─────────────────────────────────────────────
@@ -21,13 +21,10 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 # ─────────────────────────────────────────────
 app = Flask(__name__)
 
-# API_KEY is stored as a Railway environment variable.
-# Never hard-code it here.
 API_KEY = os.environ.get("API_KEY", "")
 
 
 def require_api_key(f):
-    """Decorator: reject any request that doesn't carry the correct x-api-key header."""
     @functools.wraps(f)
     def decorated(*args, **kwargs):
         incoming_key = request.headers.get("x-api-key", "")
@@ -43,19 +40,24 @@ def require_api_key(f):
 # 2. Load model & preprocessor at startup
 # ─────────────────────────────────────────────
 ARTIFACT_DIR = os.environ.get("ARTIFACT_DIR", "model_artifacts")
-MODEL_PATH = os.path.join(ARTIFACT_DIR, "multi_task_distilbert.pt")
+MODEL_PATH   = os.path.join(ARTIFACT_DIR, "multi_task_distilbert.pt")
 PREP_PATH    = os.path.join(ARTIFACT_DIR, "preprocessor.pkl")
 
-# Download only if not already present (volume caches them)
+os.makedirs(ARTIFACT_DIR, exist_ok=True)
+
 if not os.path.exists(MODEL_PATH):
+    print("Downloading model...")
     zip_path = os.path.join(ARTIFACT_DIR, "model.zip")
-    gdown.download("https://drive.google.com/file/d/1G4S_dESLgLrAuW5rDvhsdeZdi4cJhT5R/view?usp=drive_link", zip_path, fuzzy=True)
+    gdown.download(id="1G4S_dESLgLrAuW5rDvhsdeZdi4cJhT5R", output=zip_path)
     with zipfile.ZipFile(zip_path, 'r') as z:
         z.extractall(ARTIFACT_DIR)
-    os.remove(zip_path)  # clean up zip after extracting
+    os.remove(zip_path)
+    print("Model downloaded and extracted.")
 
 if not os.path.exists(PREP_PATH):
-    gdown.download("https://drive.google.com/file/d/1TBh8UlAyOWC1li8pIqnoH3VloZwztTw4/view?usp=drive_link", PREP_PATH, fuzzy=True)
+    print("Downloading preprocessor...")
+    gdown.download(id="1TBh8UlAyOWC1li8pIqnoH3VloZwztTw4", output=PREP_PATH)
+    print("Preprocessor downloaded.")
 
 print(f"Loading model from {MODEL_PATH} ...")
 _model = torch.load(MODEL_PATH, map_location=torch.device('cpu'))
@@ -72,34 +74,22 @@ _SOURCE_NAMES   = _prep.get("source_names", [])
 
 
 # ─────────────────────────────────────────────
-# 3. Text cleaning  — IDENTICAL to notebook
-#    DO NOT modify this function
+# 3. Text cleaning — IDENTICAL to notebook
 # ─────────────────────────────────────────────
 def clean_text(text: str) -> str:
-    """
-    Remove leaking signals and scraping artifacts from article text.
-    Applied identically at training time and inference time.
-    """
     if not isinstance(text, str):
         return ""
 
-    # Remove Reuters dateline prefix
     text = re.sub(r"^[A-Z ,]+\(reuters\)\s*[-\u2013]\s*", "", text, flags=re.IGNORECASE)
-
-    # Remove URLs and raw HTML
     text = re.sub(r"https?://\S+|www\.\S+", " ", text)
     text = re.sub(r"<[^>]+>", " ", text)
     text = re.sub(r"&[a-z]+;", " ", text)
-
-    # Remove JS / CDATA scraping artifacts
     text = re.sub(r"//\s*<!\[CDATA\[.*?\]\]>", " ", text, flags=re.DOTALL)
     text = re.sub(r"var\s+\w+\s*=\s*", " ", text)
 
-    # Remove source-name tokens
     for name in _SOURCE_NAMES:
         text = re.sub(rf"\b{re.escape(name)}\b", " ", text, flags=re.IGNORECASE)
 
-    # Standard normalisation
     text = text.lower()
     text = re.sub(r"\[.*?\]", " ", text)
     text = re.sub(r"[%s]" % re.escape(string.punctuation), " ", text)
@@ -114,16 +104,6 @@ def clean_text(text: str) -> str:
 # 4. Inference
 # ─────────────────────────────────────────────
 def predict_news(news_text: str, threshold: float = 0.5) -> dict:
-    """
-    Classify raw news text.
-
-    Returns
-    -------
-    {
-        "fake_or_true": "Fake" | "True",
-        "category":     "<category string>"
-    }
-    """
     cleaned = clean_text(news_text)
     seq     = _tokenizer.texts_to_sequences([cleaned])
     padded  = pad_sequences(seq, maxlen=_MAX_LEN, padding="post")
@@ -133,8 +113,6 @@ def predict_news(news_text: str, threshold: float = 0.5) -> dict:
     fake_prob = float(prob_f[0][0])
     label     = "True" if fake_prob > threshold else "Fake"
     category  = _le.inverse_transform([int(np.argmax(prob_s))])[0]
-
-    # Clean up category display (e.g. "politicsNews" → "Politics")
     category_display = category.replace("News", "").strip().title()
 
     return {
@@ -148,7 +126,6 @@ def predict_news(news_text: str, threshold: float = 0.5) -> dict:
 # ─────────────────────────────────────────────
 @app.route("/", methods=["GET"])
 def health():
-    """Health check — no auth required."""
     return jsonify({
         "status":     "ok",
         "categories": _le.classes_.tolist(),
@@ -158,12 +135,6 @@ def health():
 @app.route("/predict", methods=["POST"])
 @require_api_key
 def predict():
-    """
-    POST /predict
-    Header : x-api-key: <your_key>
-    Body   : { "text": "some news content" }
-    Returns: { "fake_or_true": "Fake", "category": "Politics" }
-    """
     body = request.get_json(silent=True)
 
     if not body or "text" not in body:
@@ -186,4 +157,5 @@ def predict():
 # ─────────────────────────────────────────────
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)t("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
