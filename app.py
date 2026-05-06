@@ -10,7 +10,7 @@ import pickle
 import functools
 import torch
 import gdown
-
+import zipfile
 import numpy as np
 from flask import Flask, request, jsonify
 import tensorflow as tf
@@ -48,10 +48,14 @@ PREP_PATH    = os.path.join(ARTIFACT_DIR, "preprocessor.pkl")
 
 # Download only if not already present (volume caches them)
 if not os.path.exists(MODEL_PATH):
-    gdown.download("https://drive.google.com/drive/folders/1XQtOiU5kmTOwTiF9AeAWA9CftxycfsY_?usp=drive_link", MODEL_PATH, fuzzy=True)
+    zip_path = os.path.join(ARTIFACT_DIR, "model.zip")
+    gdown.download("https://drive.google.com/file/d/1G4S_dESLgLrAuW5rDvhsdeZdi4cJhT5R/view?usp=drive_link", zip_path, fuzzy=True)
+    with zipfile.ZipFile(zip_path, 'r') as z:
+        z.extractall(ARTIFACT_DIR)
+    os.remove(zip_path)  # clean up zip after extracting
 
 if not os.path.exists(PREP_PATH):
-    gdown.download("https://drive.google.com/drive/folders/1XQtOiU5kmTOwTiF9AeAWA9CftxycfsY_?usp=drive_link", PREP_PATH, fuzzy=True)
+    gdown.download("https://drive.google.com/file/d/1TBh8UlAyOWC1li8pIqnoH3VloZwztTw4/view?usp=drive_link", PREP_PATH, fuzzy=True)
 
 print(f"Loading model from {MODEL_PATH} ...")
 _model = torch.load(MODEL_PATH, map_location=torch.device('cpu'))
