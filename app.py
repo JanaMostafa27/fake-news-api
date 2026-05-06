@@ -9,8 +9,6 @@ import string
 import pickle
 import functools
 import torch
-import gdown
-import zipfile
 
 import numpy as np
 from flask import Flask, request, jsonify
@@ -45,18 +43,29 @@ PREP_PATH    = os.path.join(ARTIFACT_DIR, "preprocessor.pkl")
 
 os.makedirs(ARTIFACT_DIR, exist_ok=True)
 
+from huggingface_hub import hf_hub_download
+
+HF_REPO = "JanaMostafa2/Trustera_model"
+HF_TOKEN = os.environ.get("HF_TOKEN", "")
+
 if not os.path.exists(MODEL_PATH):
-    print("Downloading model...")
-    zip_path = os.path.join(ARTIFACT_DIR, "model.zip")
-    gdown.download(id="1G4S_dESLgLrAuW5rDvhsdeZdi4cJhT5R", output=zip_path)
-    with zipfile.ZipFile(zip_path, 'r') as z:
-        z.extractall(ARTIFACT_DIR)
-    os.remove(zip_path)
-    print("Model downloaded and extracted.")
+    print("Downloading model from Hugging Face...")
+    hf_hub_download(
+        repo_id=HF_REPO,
+        filename="multi_task_distilbert.pt",
+        local_dir=ARTIFACT_DIR,
+        token=HF_TOKEN
+    )
+    print("Model downloaded.")
 
 if not os.path.exists(PREP_PATH):
-    print("Downloading preprocessor...")
-    gdown.download(id="1TBh8UlAyOWC1li8pIqnoH3VloZwztTw4", output=PREP_PATH)
+    print("Downloading preprocessor from Hugging Face...")
+    hf_hub_download(
+        repo_id=HF_REPO,
+        filename="preprocessor.pkl",
+        local_dir=ARTIFACT_DIR,
+        token=HF_TOKEN
+    )
     print("Preprocessor downloaded.")
 
 print(f"Loading model from {MODEL_PATH} ...")
