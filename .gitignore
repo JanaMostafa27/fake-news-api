@@ -1,9 +1,34 @@
+# Python
 __pycache__/
 *.pyc
 *.pyo
+
+# Env
 .env
+.env.*
+
+# Model artifacts
 model_artifacts/
 model_bundle.zip
 *.keras
 *.pkl
+*.pt
+*.bin
+*.h5
+*.onnx
+
+# Hugging Face cache
+.cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs & temp
+*.log
+tmp/
+temp/
+
+# OS / Editor
 .DS_Store
+.vscode/
+.idea/
