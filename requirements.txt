@@ -5,4 +5,4 @@ scikit-learn==1.4.2
 gunicorn==22.0.0
 torch
 transformers
-gdown
+huggingface_hub
