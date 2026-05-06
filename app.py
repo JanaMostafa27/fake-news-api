@@ -8,6 +8,7 @@ import re
 import string
 import pickle
 import functools
+import torch
 
 import numpy as np
 from flask import Flask, request, jsonify
@@ -41,11 +42,12 @@ def require_api_key(f):
 # 2. Load model & preprocessor at startup
 # ─────────────────────────────────────────────
 ARTIFACT_DIR = os.environ.get("ARTIFACT_DIR", "model_artifacts")
-MODEL_PATH   = os.path.join(ARTIFACT_DIR, "multi_task_model.keras")
+MODEL_PATH = os.path.join(ARTIFACT_DIR, "multi_task_distilbert.pt")
 PREP_PATH    = os.path.join(ARTIFACT_DIR, "preprocessor.pkl")
 
 print(f"Loading model from {MODEL_PATH} ...")
-_model = tf.keras.models.load_model(MODEL_PATH)
+_model = torch.load(MODEL_PATH, map_location=torch.device('cpu'))
+_model.eval()
 print("Model loaded.")
 
 with open(PREP_PATH, "rb") as f:
